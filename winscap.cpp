@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
             if (flags & AUDCLNT_BUFFERFLAGS_SILENT)
                 pData = pSilence;
 
-            fwrite(pData, wfx.nBlockAlign, numFramesAvailable, stdout);
+            _write(_fileno(stdout), pData, wfx.nBlockAlign * numFramesAvailable);
             ensure(pCapture->ReleaseBuffer(numFramesAvailable));
             ensure(pCapture->GetNextPacketSize(&packetLength));
         }
