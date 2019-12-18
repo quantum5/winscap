@@ -1,4 +1,4 @@
-# `winscap`
+# `winscap` [![][1]][2]
 
 Windows raw sound output capture tool.
 
@@ -22,7 +22,7 @@ You need a new enough Visual C++ toolchain. To build, run
 
 ## Background
 
-I created this tool as a lightweight approach to run [Cava][1] on Windows Subsystem
+I created this tool as a lightweight approach to run [Cava][3] on Windows Subsystem
 for Linux (WSL) while using sound output from Windows.
 
 To use with Cava, configure Cava to read from a named pipe inside WSL (we'll use
@@ -45,4 +45,6 @@ $ /mnt/c/path/to/winscap.exe 2 48000 16 > /tmp/cava.fifo
 
 Again, replace the arguments as appropriate.
 
-  [1]: https://github.com/karlstav/cava
+  [1]: https://github.com/quantum5/winscap/workflows/build/badge.svg
+  [2]: https://github.com/quantum5/winscap/actions
+  [3]: https://github.com/karlstav/cava
