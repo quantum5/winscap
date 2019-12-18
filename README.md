@@ -16,7 +16,7 @@ If your capture settings do not match, `winscap` will fail to start.
 
 ## Binaries
 
-The latest stable binaries is available on [GitHub releases][3] ([winscap.exe][4]).
+The latest stable binaries are available on [GitHub releases][3] ([winscap.exe][4]).
 
 Latest bleeding edge binaries are available as artifacts on [GitHub Actions][2].
 
