@@ -46,6 +46,7 @@ Replace `48000` with whatever sampling rate you use with `winscap`.
 Then, run `winscap` as follows:
 
 ```sh
+$ mkfifo /tmp/cava.fifo
 $ /mnt/c/path/to/winscap.exe 2 48000 16 > /tmp/cava.fifo
 ```
 
