@@ -5,6 +5,7 @@
 #include <comdef.h>
 #include <comip.h>
 #include <fcntl.h>
+#include <functiondiscoverykeys_devpkey.h>
 #include <io.h>
 #include <mmdeviceapi.h>
 #include <stdio.h>
@@ -31,13 +32,16 @@ _COM_SMARTPTR_TYPEDEF(IMMDeviceEnumerator, __uuidof(IMMDeviceEnumerator));
 _COM_SMARTPTR_TYPEDEF(IMMDevice, __uuidof(IMMDevice));
 _COM_SMARTPTR_TYPEDEF(IAudioClient, __uuidof(IAudioClient));
 _COM_SMARTPTR_TYPEDEF(IAudioCaptureClient, __uuidof(IAudioCaptureClient));
+_COM_SMARTPTR_TYPEDEF(IPropertyStore, __uuidof(IPropertyStore));
 
 class DeviceChangeNotification : public IMMNotificationClient {
     volatile ULONG ref;
     volatile bool &changed;
+    HANDLE hEvent;
 
   public:
-    DeviceChangeNotification(volatile bool &changed) : changed(changed) {}
+    DeviceChangeNotification(volatile bool &changed, HANDLE hEvent)
+        : changed(changed), hEvent(hEvent) {}
 
     // This is meant to be allocated on stack, so we don't actually free.
     STDMETHODIMP_(ULONG) AddRef() { return InterlockedIncrement(&ref); }
@@ -60,6 +64,7 @@ class DeviceChangeNotification : public IMMNotificationClient {
     STDMETHODIMP OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR) {
         if (flow == eRender && role == eConsole) {
             changed = true;
+            SetEvent(hEvent);
         }
         return S_OK;
     }
@@ -93,19 +98,20 @@ struct {
     {AUDCLNT_E_UNSUPPORTED_FORMAT, L"Requested sound format unsupported"},
 };
 
+LPCWSTR error_message(const _com_error &err) {
+    for (int i = 0; i < sizeof error_table / sizeof error_table[0]; ++i) {
+        if (error_table[i].hr == err.Error()) {
+            return error_table[i].error;
+        }
+    }
+    return err.ErrorMessage();
+}
+
 #define ensure(hr) ensure_(__FILE__, __LINE__, hr)
 void ensure_(const char *file, int line, HRESULT hr) {
     if (FAILED(hr)) {
         _com_error err(hr);
-        LPCWSTR msg = err.ErrorMessage();
-
-        for (int i = 0; i < sizeof error_table / sizeof error_table[0]; ++i) {
-            if (error_table[i].hr == hr) {
-                msg = error_table[i].error;
-            }
-        }
-
-        fwprintf(stderr, L"Error at %S:%d (0x%08x): %s\n", file, line, hr, msg);
+        fwprintf(stderr, L"Error at %S:%d (0x%08x): %s\n", file, line, hr, error_message(err));
         exit(1);
     }
 }
@@ -149,18 +155,35 @@ int main(int argc, char *argv[]) {
     ensure(pEnumerator.CreateInstance(__uuidof(MMDeviceEnumerator)));
 
     volatile bool deviceChanged = false;
-    DeviceChangeNotification deviceChangeNotification(deviceChanged);
+    HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    DeviceChangeNotification deviceChangeNotification(deviceChanged, hEvent);
     pEnumerator->RegisterEndpointNotificationCallback(&deviceChangeNotification);
 
     for (;;) {
+        ResetEvent(hEvent);
+
         IMMDevicePtr pDevice;
         ensure(pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice));
 
         IAudioClientPtr pClient;
         ensure(pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void **)&pClient));
 
-        ensure(pClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-                                   16 * REFTIMES_PER_MILLISEC, 0, &wfx, nullptr));
+        HRESULT hrInit = pClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+                                             16 * REFTIMES_PER_MILLISEC, 0, &wfx, nullptr);
+        if (FAILED(hrInit)) {
+            _com_error err(hrInit);
+
+            IPropertyStorePtr pProps;
+            ensure(pDevice->OpenPropertyStore(STGM_READ, &pProps));
+
+            PROPVARIANT varName;
+            PropVariantInit(&varName);
+            ensure(pProps->GetValue(PKEY_Device_FriendlyName, &varName));
+            fwprintf(stderr, L"Failed to open: %s: %s\n", varName.pwszVal, error_message(err));
+            PropVariantClear(&varName);
+            WaitForSingleObject(hEvent, INFINITE);
+            continue;
+        }
 
         UINT32 bufferFrameCount;
         ensure(pClient->GetBufferSize(&bufferFrameCount));
