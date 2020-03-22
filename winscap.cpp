@@ -5,12 +5,13 @@
 #include <comdef.h>
 #include <comip.h>
 #include <fcntl.h>
-#include <functiondiscoverykeys_devpkey.h>
 #include <io.h>
 #include <mmdeviceapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
+
+#include <functiondiscoverykeys_devpkey.h>
 
 #define REFTIMES_PER_SEC 10000000
 #define REFTIMES_PER_MILLISEC 10000
